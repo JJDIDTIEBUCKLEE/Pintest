@@ -1,0 +1,1288 @@
+Public colIndex As Integer
+Public rowIndex As Integer
+Public entryCount As Long
+Public lotValue As String
+Public caseTracker As Object
+Public theDate As String
+Public pinNum As String
+
+Public lotNum30P1 As Boolean
+Public lotNum30P2 As Boolean
+Public lotNum30P3 As Boolean
+Public lotNum30P4 As Boolean
+Public lotNum30P5 As Boolean
+Public lotNum30P6 As Boolean
+Public lotNum30P7 As Boolean
+Public lotNum30P8 As Boolean
+Public lotNum30P9 As Boolean
+
+Public wsOutput As Worksheet
+Public filePicker As FileDialog
+Public csvPath As String
+Public fileNum As Integer, line As String
+Public dataArr() As String
+Public targetRow As Long
+Public headerRow As Long
+Public headerMap As Object
+Public compNameCol As Integer, statusCol As Integer
+Public designRowIndex As Long, uslRowIndex As Long, lslRowIndex As Long
+Public avgRow As Long, stdDevRow As Long
+Public cmkRow As Long, cmRow As Long
+Public i As Integer
+Public lotCol As Integer
+Public designValues() As String, uslValues() As String, lslValues() As String
+Public csvFile As Variant
+Public fileName As String
+Public extractedStr As String
+Public parts As Variant
+Public x As Integer
+
+Public newFileCounter As Integer
+Public entryCount301 As Integer
+Public entryCount302 As Integer
+Public entryCount303 As Integer
+Public entryCount304 As Integer
+Public entryCount305 As Integer
+Public entryCount306 As Integer
+Public entryCount307 As Integer
+Public entryCount308 As Integer
+Public entryCount309 As Integer
+    
+    
+
+
+
+Sub GenerateDynamicFormatAndExtractData()
+
+    
+    ' Initialize File Picker to allow multi-file selection
+    Set filePicker = Application.FileDialog(msoFileDialogFilePicker)
+    filePicker.Title = "Select CSV Files"
+    filePicker.AllowMultiSelect = True
+    filePicker.Filters.Add "CSV Files", "*.csv"
+    ' Check if user selects files
+    If filePicker.Show = -1 Then
+        For Each csvFile In filePicker.SelectedItems
+            csvPath = csvFile
+
+            ' Extract filename from full path
+            fileName = Mid(csvFile, InStrRev(csvFile, "\") + 1)
+
+            ' Remove file extension (.csv)
+            fileName = Left(fileName, Len(fileName) - 4)
+
+            ' Split filename using "_" and "-" as delimiters
+            parts = Split(Replace(fileName, "-", "_"), "_")
+
+            ' Extract specific segments (ED30 and CD111) based on filename structure
+            If UBound(parts) >= 3 Then
+                extractedStr = parts(2) & "_" & parts(3)
+            Else
+                'MsgBox "Filename format does not match expected pattern!", vbExclamation, "Error"
+                'Exit Sub
+                extractedStr = "wrong format dummy"
+            End If
+            ' Create a new sheet using the extracted key characters
+            Set wsOutput = ThisWorkbook.Sheets.Add
+            wsOutput.Name = extractedStr
+
+            ' Clear sheet before inserting new data
+            
+            wsOutput.Cells.Clear
+            
+            
+            entryCount = 0
+            OgEntryCount = 0
+            
+            lotNum30P1 = False
+            lotNum30P2 = False
+            lotNum30P3 = False
+            lotNum30P4 = False
+            lotNum30P5 = False
+            lotNum30P6 = False
+            lotNum30P7 = False
+            lotNum30P8 = False
+            lotNum30P9 = False
+            
+            entryCount301 = 0
+            entryCount302 = 0
+            entryCount303 = 0
+            entryCount304 = 0
+            entryCount305 = 0
+            entryCount306 = 0
+            entryCount307 = 0
+            entryCount308 = 0
+            entryCount309 = 0
+            lotCol = 0
+            pinNum = 0
+            lotValue = 0
+            colIndex = 0
+            
+            
+            
+            ' Set starting row for headers
+            headerRow = 2
+            targetRow = headerRow + 1
+
+            ' Open CSV file to count valid rows
+            fileNum = FreeFile()
+            Open csvPath For Input As #fileNum
+
+            ' Read headers and map column indices
+            Line Input #fileNum, line
+            dataArr = Split(line, ",")
+            Set headerMap = CreateObject("Scripting.Dictionary")
+
+            For entryCount = LBound(dataArr) To UBound(dataArr)
+                headerMap(Trim(dataArr(entryCount))) = entryCount + 1
+                If Trim(dataArr(entryCount)) = "Computer Name" Then compNameCol = entryCount + 1
+                If Trim(dataArr(entryCount)) = "OK/NG" Then statusCol = entryCount + 1
+                If Trim(dataArr(entryCount)) = "Lot Number" Then lotCol = entryCount + 1
+            Next entryCount
+
+            ' Validate header mapping
+            If compNameCol = 0 Or statusCol = 0 Then
+                MsgBox "Error: Required column headers not found!", vbExclamation, "Check CSV Format"
+                Exit Sub
+            End If
+
+            entryCount = 0  ' Count the number of valid rows
+
+
+            ' Loop through CSV, extracting data for "LM1100-GU-TACE" entries while filtering statuses
+            Do Until EOF(fileNum)
+                Line Input #fileNum, line
+                dataArr = Split(line, ",")
+                If x < 1 Then
+                    'MsgBox "Extracted F2 value: " & dataArr(5), vbInformation, "Debugging"
+                    wsOutput.Cells(2, 1).Value = dataArr(5)
+                    pinNum = dataArr(5)
+                    wsOutput.Cells(3, 1).Value = "DATE: " + dataArr(1)
+                    theDate = "DATE: " + dataArr(1)
+                x = x + 1
+                End If
+                ' Locate and store row positions for Design, USL, LSL
+                If Trim(dataArr(0)) = "Design value" Then
+                    designRowIndex = targetRow + entryCount + 1
+                    designValues = dataArr
+                    Debug.Print lotCol
+                    Debug.Print colIndex
+                End If
+
+                If Trim(dataArr(0)) = "Upper limit standard value" Then
+                    uslRowIndex = targetRow + entryCount + 2
+                    uslValues = dataArr
+                    Debug.Print lotCol
+                    Debug.Print colIndex
+                End If
+
+                If Trim(dataArr(0)) = "Lower limit standard value" Then
+                    lslRowIndex = targetRow + entryCount + 3
+                    lslValues = dataArr
+                    Debug.Print lotCol
+                    Debug.Print colIndex
+                End If
+
+                '' Filter by Lot Number and Status
+                If (Trim(dataArr(statusCol - 1)) = "NG" Or Trim(dataArr(statusCol - 1)) = "OK" Or Trim(dataArr(statusCol - 1)) = "---") And Trim(dataArr(compNameCol - 1)) = "LM1100-GU-TACE" Then
+
+                    If lotCol > 0 Then
+                        lotValue = Trim(Split(dataArr(lotCol - 1), " ")(0))
+                        If val(lotValue) >= 30.1 And val(lotValue) <= 30.9 Then
+                            Call CheckLotValue
+                            wsOutput.Cells(targetRow + entryCount + 1, colIndex + 2).Value = "LM1100-GU-TACE " & lotValue
+                            entryCount = entryCount + 1
+                            wsOutput.Cells(targetRow + entryCount, colIndex + 1).Value = entryCount
+                        End If
+                    End If
+                    For i = 3 To 10
+                    wsOutput.Cells(targetRow + entryCount, colIndex + i).Value = dataArr(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    Next i
+                End If
+
+            Loop
+            Close #fileNum
+            x = 0
+            mathFunctions
+            newFileCounter = newFileCounter + 1
+            
+       Next csvFile
+    Else
+        MsgBox "No file selected!", vbExclamation, "Process Cancelled"
+        Exit Sub
+    End If
+
+    MsgBox "Processing Complete!", vbInformation, "Success"
+End Sub
+
+
+
+Sub CheckLotValue()
+    
+    If caseTracker Is Nothing Then
+        Set caseTracker = CreateObject("Scripting.Dictionary")
+    End If
+    
+    If newFileCounter > 0 Then
+        If caseTracker.exists("30.1") Then
+            caseTracker.Remove "30.1"
+        End If
+        If caseTracker.exists("30.2") Then
+            caseTracker.Remove "30.2"
+        End If
+        If caseTracker.exists("30.3") Then
+            caseTracker.Remove "30.3"
+        End If
+        If caseTracker.exists("30.4") Then
+            caseTracker.Remove "30.4"
+        End If
+        If caseTracker.exists("30.5") Then
+            caseTracker.Remove "30.5"
+        End If
+        If caseTracker.exists("30.6") Then
+            caseTracker.Remove "30.6"
+        End If
+        If caseTracker.exists("30.7") Then
+            caseTracker.Remove "30.7"
+        End If
+        If caseTracker.exists("30.8") Then
+            caseTracker.Remove "30.8"
+        End If
+        If caseTracker.exists("30.9") Then
+            caseTracker.Remove "30.9"
+        End If
+        
+        newFileCounter = 0
+            
+    End If
+    
+    Select Case val(lotValue)
+        Case 30.1
+            
+            colIndex = 0
+            lotNum30P1 = True
+            
+            
+            If lotNum30P1 Then
+                entryCount301 = entryCount301 + 1
+            End If
+            
+            If Not caseTracker.exists("30.1") Then
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                'MsgBox "First time running Case 30.1"
+                caseTracker.Add "30.1", True
+            End If
+
+        Case 30.2
+            
+            colIndex = 10
+            lotNum30P2 = True
+            
+            
+            If lotNum30P1 = True Then
+                entryCount = entryCount302
+            End If
+            
+            If lotNum30P2 Then
+                entryCount302 = entryCount302 + 1
+            End If
+   
+            If Not caseTracker.exists("30.2") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+                MsgBox "colIndex is 10"
+
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                targetRow = headerRow + 1
+                MsgBox "First time running Case 30.2"
+                caseTracker.Add "30.2", True
+            
+            End If
+
+        Case 30.3
+            
+            colIndex = 20
+            lotNum30P3 = True
+            
+            If lotNum30P1 Or lotNum30P2 Then
+               entryCount = entryCount303
+            End If
+            
+            If lotNum30P3 Then
+                entryCount303 = entryCount303 + 1
+            End If
+                
+            If Not caseTracker.exists("30.3") Then
+
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+            
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                targetRow = headerRow + 1
+                caseTracker.Add "30.3", True
+                
+            End If
+
+
+
+        Case 30.4
+        
+            colIndex = 30
+            lotNum30P4 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Then
+               entryCount = entryCount304
+            End If
+            
+            If lotNum30P4 Then
+                entryCount304 = entryCount304 + 1
+            End If
+
+        
+            If Not caseTracker.exists("30.4") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+                MsgBox "colIndex is 30"
+                
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+    
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                MsgBox "First time running Case 30.4"
+                caseTracker.Add "30.4", True
+            
+            End If
+
+        Case 30.5
+        
+            colIndex = 40
+            lotNum30P5 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Or lotNum30P4 Then
+               entryCount = entryCount305
+            End If
+            
+            If lotNum30P5 Then
+                entryCount305 = entryCount305 + 1
+            End If
+
+        
+            If Not caseTracker.exists("30.5") Then
+                
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+                MsgBox "colIndex is 40"
+
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                MsgBox "First time running Case 30.5"
+                caseTracker.Add "30.5", True
+            
+            End If
+            
+
+        Case 30.6
+        
+            colIndex = 50
+            lotNum30P6 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Or lotNum30P4 Or lotNum30P5 Then
+               entryCount = entryCount306
+            End If
+            
+            If lotNum30P6 Then
+                entryCount306 = entryCount306 + 1
+            End If
+            
+            If Not caseTracker.exists("30.6") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+                MsgBox "colIndex is 50"
+            
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                MsgBox "First time running Case 30.6"
+                caseTracker.Add "30.6", True
+                    
+            End If
+
+        Case 30.7
+        
+            colIndex = 60
+            lotNum30P7 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Or lotNum30P4 Or lotNum30P5 Or lotNum30P6 Then
+               entryCount = entryCount307
+            End If
+            
+            If lotNum30P7 Then
+                entryCount307 = entryCount307 + 1
+            End If
+        
+            If Not caseTracker.exists("30.7") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+                MsgBox "colIndex is 60"
+    
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+    
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                MsgBox "First time running Case 30.7"
+                caseTracker.Add "30.7", True
+                
+            End If
+        
+        
+        Case 30.8
+        
+            colIndex = 70
+            lotNum30P8 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Or lotNum30P4 Or lotNum30P5 Or lotNum30P6 Or lotNum30P7 Then
+               entryCount = entryCount308
+            End If
+            
+            If lotNum30P8 Then
+                entryCount308 = entryCount308 + 1
+            End If
+        
+            If Not caseTracker.exists("30.8") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+
+    
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+    
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                caseTracker.Add "30.8", True
+                
+            End If
+        
+        
+        Case 30.9
+        
+            colIndex = 80
+            lotNum30P9 = True
+            
+            If lotNum30P1 Or lotNum30P2 Or lotNum30P3 Or lotNum30P4 Or lotNum30P5 Or lotNum30P6 Or lotNum30P7 Or lotNum30P8 Then
+               entryCount = entryCount309
+            End If
+            
+            If lotNum30P9 Then
+                entryCount309 = entryCount309 + 1
+            End If
+        
+            If Not caseTracker.exists("30.9") Then
+            
+                Set wsOutput = ActiveSheet
+                headerRow = 2
+    
+                ' Insert headers
+                wsOutput.Cells(headerRow, colIndex + 1).Value = pinNum
+                wsOutput.Cells(headerRow + 1, colIndex + 1).Value = theDate
+                wsOutput.Cells(headerRow + 1, colIndex + 2).Value = "Computer Name"
+    
+                ' Measurement Headers
+                wsOutput.Cells(headerRow + 1, colIndex + 3).Value = "[1]PinbreiteDach"
+                wsOutput.Cells(headerRow + 1, colIndex + 4).Value = "[2]PinbreiteFuss"
+                wsOutput.Cells(headerRow + 1, colIndex + 5).Value = "[3]Winkel1"
+                wsOutput.Cells(headerRow + 1, colIndex + 6).Value = "[4]Winkel2"
+                wsOutput.Cells(headerRow + 1, colIndex + 7).Value = "[5]Winkel3"
+                wsOutput.Cells(headerRow + 1, colIndex + 8).Value = "[6]Dachhöhe"
+                wsOutput.Cells(headerRow + 1, colIndex + 9).Value = "[9]Seitenlänge2"
+                wsOutput.Cells(headerRow + 1, colIndex + 10).Value = "[10]Seitenlänge3"
+                MsgBox "First time running Case 30.9"
+                caseTracker.Add "30.9", True
+                
+            End If
+            
+
+    End Select
+End Sub
+
+
+Sub mathFunctions()
+        
+        If lotNum30P1 Then
+            ' Set row positions dynamically
+            designRowIndex = targetRow + entryCount301 + 1
+            uslRowIndex = targetRow + entryCount301 + 2
+            lslRowIndex = targetRow + entryCount301 + 3
+            avgRow = lslRowIndex + 1
+            stdDevRow = avgRow + 1
+            cmkRow = stdDevRow + 1
+            cmRow = cmkRow + 1
+    
+            ' Insert Design, USL, LSL values using stored row data
+            wsOutput.Cells(designRowIndex, 1).Value = "Design value"
+            wsOutput.Cells(designRowIndex, 2).Value = "Design"
+            Debug.Print lotCol
+            Debug.Print colIndex
+            wsOutput.Cells(uslRowIndex, 1).Value = "Upper limit standard value"
+            wsOutput.Cells(uslRowIndex, 2).Value = "USL"
+            wsOutput.Cells(lslRowIndex, 1).Value = "Lower limit standard value"
+            wsOutput.Cells(lslRowIndex, 2).Value = "LSL"
+    
+            For i = 3 To 10
+                wsOutput.Cells(designRowIndex, i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                wsOutput.Cells(uslRowIndex, i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                wsOutput.Cells(lslRowIndex, i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+            Next i
+    
+            ' Restore formulas for Average and Standard Deviation
+            wsOutput.Cells(avgRow, 1).Value = "Average"
+            wsOutput.Cells(avgRow, 2).Value = "Avg"
+    
+            wsOutput.Cells(stdDevRow, 1).Value = "Standard Deviation"
+            wsOutput.Cells(stdDevRow, 2).Value = "Std Dev"
+    
+            For i = 3 To 10
+                wsOutput.Cells(avgRow, i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, i).Address & ":" & wsOutput.Cells(targetRow + entryCount301, i).Address & ")"
+                wsOutput.Cells(stdDevRow, i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, i).Address & ":" & wsOutput.Cells(targetRow + entryCount301, i).Address & ")"
+            Next i
+    
+                ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                wsOutput.Cells(cmkRow, 2).Value = "CMK"
+                wsOutput.Cells(cmRow, 2).Value = "CM"
+    
+            For i = 3 To 10
+                ' Apply CMK formula
+                wsOutput.Cells(cmkRow, i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, i).Address & "-" & wsOutput.Cells(avgRow, i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, i).Address & "),(" & wsOutput.Cells(avgRow, i).Address & "-" & wsOutput.Cells(lslRowIndex, i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, i).Address & "))"
+    
+                ' Apply CM formula
+                wsOutput.Cells(cmRow, i).Formula = "=(" & wsOutput.Cells(uslRowIndex, i).Address & "-" & wsOutput.Cells(lslRowIndex, i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, i).Address & ")"
+    
+                ' Check CMK value and apply color
+                If IsNumeric(wsOutput.Cells(cmkRow, i).Value) Then
+                    If wsOutput.Cells(cmkRow, i).Value < 1.33 Then
+                        wsOutput.Cells(cmkRow, i).Interior.Color = RGB(255, 99, 71) ' Red
+                    ElseIf wsOutput.Cells(cmkRow, i).Value >= 1.33 And wsOutput.Cells(cmkRow, i).Value <= 1.65 Then
+                        wsOutput.Cells(cmkRow, i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                    Else
+                        wsOutput.Cells(cmkRow, i).Interior.Color = RGB(144, 238, 144) ' Green
+                    End If
+                End If
+    
+                ' Check CM value and apply color
+                If IsNumeric(wsOutput.Cells(cmRow, i).Value) Then
+                    If wsOutput.Cells(cmRow, i).Value < 1.33 Then
+                        wsOutput.Cells(cmRow, i).Interior.Color = RGB(255, 99, 71) ' Red
+                    ElseIf wsOutput.Cells(cmRow, i).Value >= 1.33 And wsOutput.Cells(cmRow, i).Value <= 1.65 Then
+                        wsOutput.Cells(cmRow, i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                    Else
+                        wsOutput.Cells(cmRow, i).Interior.Color = RGB(144, 238, 144) ' Green
+                    End If
+                End If
+            Next i
+            
+        End If
+        
+        
+        If lotNum30P2 Then
+                
+                colIndex = 10
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount302 + 1
+                uslRowIndex = targetRow + entryCount302 + 2
+                lslRowIndex = targetRow + entryCount302 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount302, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount302, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            If lotNum30P3 Then
+                'Establish column index
+                colIndex = 20
+                
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount303 + 1
+                uslRowIndex = targetRow + entryCount303 + 2
+                lslRowIndex = targetRow + entryCount303 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+                
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount303, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount303, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                ' Apply CMK formula
+                wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+    
+                ' Apply CM formula
+                wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+                    
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71)   ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153)   ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144)   ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71)   ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153)   ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144)   ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            If lotNum30P4 Then
+                
+                colIndex = 30
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount304 + 1
+                uslRowIndex = targetRow + entryCount304 + 2
+                lslRowIndex = targetRow + entryCount304 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount304, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount304, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            If lotNum30P5 Then
+            
+                colIndex = 40
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount305 + 1
+                uslRowIndex = targetRow + entryCount305 + 2
+                lslRowIndex = targetRow + entryCount305 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount305, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount305, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            If lotNum30P6 Then
+            
+                colIndex = 50
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount306 + 1
+                uslRowIndex = targetRow + entryCount306 + 2
+                lslRowIndex = targetRow + entryCount306 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount306, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount306, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            If lotNum30P7 Then
+            
+                colIndex = 60
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount307 + 1
+                uslRowIndex = targetRow + entryCount307 + 2
+                lslRowIndex = targetRow + entryCount307 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount307, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount307, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            
+            If lotNum30P8 Then
+            
+                colIndex = 70
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount308 + 1
+                uslRowIndex = targetRow + entryCount308 + 2
+                lslRowIndex = targetRow + entryCount308 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount308, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount308, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            
+            If lotNum30P9 Then
+            
+                colIndex = 80
+                ' Set row positions dynamically
+                designRowIndex = targetRow + entryCount309 + 1
+                uslRowIndex = targetRow + entryCount309 + 2
+                lslRowIndex = targetRow + entryCount309 + 3
+                avgRow = lslRowIndex + 1
+                stdDevRow = avgRow + 1
+                cmkRow = stdDevRow + 1
+                cmRow = cmkRow + 1
+        
+                ' Insert Design, USL, LSL values using stored row data
+                wsOutput.Cells(designRowIndex, colIndex + 1).Value = "Design value"
+                wsOutput.Cells(designRowIndex, colIndex + 2).Value = "Design"
+                wsOutput.Cells(uslRowIndex, colIndex + 1).Value = "Upper limit standard value"
+                wsOutput.Cells(uslRowIndex, colIndex + 2).Value = "USL"
+                wsOutput.Cells(lslRowIndex, colIndex + 1).Value = "Lower limit standard value"
+                wsOutput.Cells(lslRowIndex, colIndex + 2).Value = "LSL"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(designRowIndex, colIndex + i).Value = designValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(uslRowIndex, colIndex + i).Value = uslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                    wsOutput.Cells(lslRowIndex, colIndex + i).Value = lslValues(headerMap(wsOutput.Cells(headerRow + 1, i).Value) - 1)
+                Next i
+        
+                ' Restore formulas for Average and Standard Deviation
+                wsOutput.Cells(avgRow, colIndex + 1).Value = "Average"
+                wsOutput.Cells(avgRow, colIndex + 2).Value = "Avg"
+        
+                wsOutput.Cells(stdDevRow, colIndex + 1).Value = "Standard Deviation"
+                wsOutput.Cells(stdDevRow, colIndex + 2).Value = "Std Dev"
+        
+                For i = 3 To 10
+                    wsOutput.Cells(avgRow, colIndex + i).Formula = "=AVERAGE(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount309, colIndex + i).Address & ")"
+                    wsOutput.Cells(stdDevRow, colIndex + i).Formula = "=STDEV.P(" & wsOutput.Cells(targetRow + 1, colIndex + i).Address & ":" & wsOutput.Cells(targetRow + entryCount309, colIndex + i).Address & ")"
+                Next i
+        
+                    ' Insert CMK and CM names under "Computer Name" and apply formulas dynamically
+                    wsOutput.Cells(cmkRow, colIndex + 2).Value = "CMK"
+                    wsOutput.Cells(cmRow, colIndex + 2).Value = "CM"
+        
+                For i = 3 To 10
+                    ' Apply CMK formula
+                    wsOutput.Cells(cmkRow, colIndex + i).Formula = "=MIN((" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(avgRow, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "),(" & wsOutput.Cells(avgRow, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(3*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & "))"
+        
+                    ' Apply CM formula
+                    wsOutput.Cells(cmRow, colIndex + i).Formula = "=(" & wsOutput.Cells(uslRowIndex, colIndex + i).Address & "-" & wsOutput.Cells(lslRowIndex, colIndex + i).Address & ")/(6*" & wsOutput.Cells(stdDevRow, colIndex + i).Address & ")"
+        
+                    ' Check CMK value and apply color
+                    If IsNumeric(wsOutput.Cells(cmkRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmkRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmkRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmkRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmkRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+        
+                    ' Check CM value and apply color
+                    If IsNumeric(wsOutput.Cells(cmRow, colIndex + i).Value) Then
+                        If wsOutput.Cells(cmRow, colIndex + i).Value < 1.33 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 99, 71) ' Red
+                        ElseIf wsOutput.Cells(cmRow, colIndex + i).Value >= 1.33 And wsOutput.Cells(cmRow, colIndex + i).Value <= 1.65 Then
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(255, 255, 153) ' Yellow
+                        Else
+                            wsOutput.Cells(cmRow, colIndex + i).Interior.Color = RGB(144, 238, 144) ' Green
+                        End If
+                    End If
+                Next i
+                
+            End If
+            
+            
+End Sub
+
+
+
+
+
+
+
+
